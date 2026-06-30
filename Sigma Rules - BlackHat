@@ -1,0 +1,322 @@
+Rule 1: Executive Display Name Impersonation
+
+title: Executive Display Name Impersonation via External Sender
+id: d4f8a2b1-3c7e-4a9d-b5f2-8e1c6d0a7f3b
+status: experimental
+description: >
+    Detects emails where the display name contains executive titles
+    but the sender domain does not match the organization domain.
+    Attackers use compromised legitimate accounts at trusted partner
+    organizations to bypass SPF/DKIM/DMARC controls entirely.
+references:
+    - https://attack.mitre.org/techniques/T1566/002/
+    - https://www.cisa.gov/sites/default/files/publications/CISA_MS-ISAC_Ransomware%20Guide_S508C.pdf
+author: Akash Parasumanna Sridhar
+date: 2026/06/01
+tags:
+    - attack.initial_access
+    - attack.t1566.002
+    - attack.t1598.003
+logsource:
+    category: email
+    definition: >
+        Requires email telemetry normalized into SIEM with fields:
+        display_name, sender_domain, sender_email.
+detection:
+    selection_exec_title:
+        display_name|contains:
+            - 'Chief Executive Officer'
+            - 'CEO'
+            - 'Chief Financial Officer'
+            - 'CFO'
+            - 'Chief Operating Officer'
+            - 'COO'
+            - 'Chief Information Officer'
+            - 'CIO'
+            - 'Chief Information Security Officer'
+            - 'CISO'
+            - 'Chief Technology Officer'
+            - 'CTO'
+            - 'Managing Director'
+            - 'Executive Director'
+            - 'VP Finance'
+            - 'Vice President'
+    filter_org_domain:
+        sender_domain|contains:
+            - 'yourdomain.com'
+    filter_automated:
+        sender_email|contains:
+            - 'noreply@'
+            - 'donotreply@'
+            - 'no-reply@'
+            - 'notifications@'
+            - 'alerts@'
+            - 'mailer@'
+            - 'system@'
+    condition: selection_exec_title and not filter_org_domain and not filter_automated
+falsepositives:
+    - External board members or advisors using executive titles
+    - Partner organization executives in legitimate collaboration
+    - Vendor sales representatives with VP or Director in signature
+level: high
+
+
+
+Rule 2: Newly Registered Domain with Phishing Keywords
+
+
+title: Phishing Email from Newly Registered Domain with Targeted Keywords
+id: a1c3e5f7-9b2d-4f6a-8c0e-2b4d6f8a0c2e
+status: experimental
+description: >
+    Detects emails from domains registered within the last 30 days
+    that contain keywords associated with targeted phishing — financial
+    requests, credential harvesting, or account actions. Attackers
+    register fresh domains specifically to evade reputation-based
+    gateway controls. Covers BEC patterns across finance, retail,
+    manufacturing, logistics, and other sectors.
+references:
+    - https://attack.mitre.org/techniques/T1566/002/
+    - https://www.ic3.gov/Media/Y2023/PSA230609
+author: Akash Parasumanna Sridhar
+date: 2026/06/01
+tags:
+    - attack.initial_access
+    - attack.t1566.002
+logsource:
+    category: email
+    definition: >
+        Requires domain_age_days field populated via WHOIS enrichment
+        at ingest time via Logstash, Cribl, or similar pipeline.
+detection:
+    selection_new_domain:
+        domain_age_days|lt: 30
+    selection_phishing_keywords:
+        email_body|contains:
+            - 'invoice'
+            - 'payment required'
+            - 'wire transfer'
+            - 'account suspended'
+            - 'account verification'
+            - 'billing statement'
+            - 'purchase order'
+            - 'remittance'
+            - 'password expir'
+            - 'verify your account'
+            - 'confirm your identity'
+            - 'update your credentials'
+            - 'urgent action required'
+    selection_link_present:
+        contains_link: true
+    filter_internal:
+        sender_domain|endswith:
+            - 'yourdomain.com'
+    condition: >
+        selection_new_domain and
+        selection_phishing_keywords and
+        selection_link_present and
+        not filter_internal
+falsepositives:
+    - Newly onboarded vendors or startups making first contact
+    - Recently rebranded organizations using a new domain
+level: high
+
+
+
+Rule 3: Auth Failure from Trusted External Domain
+
+
+title: SPF or DMARC Failure from Implicitly Trusted External Domain
+id: f7b2d4e6-1a3c-5f8b-9d2e-4c6a8f0b2d4e
+status: experimental
+description: >
+    Detects emails that fail SPF or DMARC authentication but are
+    still delivered, from domains your organization implicitly trusts.
+    Every industry maintains trusted external relationships that
+    attackers actively exploit. Auth failures from these domains
+    typically indicate account compromise or active abuse of weak
+    DMARC p=none policies rather than misconfiguration. Populate
+    the trusted domain list with your specific long-term partners,
+    regulators, and academic institutions.
+references:
+    - https://attack.mitre.org/techniques/T1566/
+    - https://attack.mitre.org/techniques/T1078/
+    - https://www.proofpoint.com/us/blog/email-and-cloud-threats/bec-taxonomy
+author: Akash Parasumanna Sridhar
+date: 2026/06/01
+tags:
+    - attack.initial_access
+    - attack.t1566
+    - attack.t1078
+logsource:
+    category: email
+    definition: >
+        Requires spf_result, dmarc_result, delivery_status fields
+        from normalized email gateway telemetry. Standard fields
+        from Proofpoint, Mimecast, and Microsoft Defender exports.
+detection:
+    selection_spf_fail:
+        spf_result: 'fail'
+    selection_dmarc_fail:
+        dmarc_result: 'fail'
+    selection_trusted_domain:
+        sender_domain|endswith:
+            - '.edu'
+            - '.gov'
+            - '.ac.uk'
+            - 'trusted-partner.com'
+    selection_delivered:
+        delivery_status: 'delivered'
+    filter_mailing_lists:
+        email_headers|contains:
+            - 'List-Unsubscribe'
+            - 'List-Id'
+    condition: >
+        (selection_spf_fail or selection_dmarc_fail) and
+        selection_trusted_domain and
+        selection_delivered and
+        not filter_mailing_lists
+falsepositives:
+    - Email forwarding from partners breaking SPF alignment
+    - Mailing list software modifying headers and breaking DKIM
+    - Legitimately misconfigured mail servers at partner organizations
+level: medium
+
+
+Rule 4: Credential Harvesting Page Linked from Email
+
+title: Credential Harvesting Infrastructure Linked from Inbound Email
+id: c9e1a3b5-7d2f-4c8e-b6a0-3f5d7b9e1a3c
+status: experimental
+description: >
+    Detects emails linking to newly established credential harvesting
+    pages. Combines domain similarity to known organizational SSO
+    portals (homograph attacks), recently issued SSL certificates,
+    and sandbox confirmation of login form content. Catches phishing
+    infrastructure before any user clicks. Applicable across all
+    industries — attackers clone SSO portals, VPN login pages, and
+    internal tool authentication screens universally.
+references:
+    - https://attack.mitre.org/techniques/T1566/002/
+    - https://attack.mitre.org/techniques/T1598/
+    - https://urlscan.io
+author: Akash Parasumanna Sridhar
+date: 2026/06/01
+tags:
+    - attack.credential_access
+    - attack.t1566.002
+    - attack.t1598
+logsource:
+    category: email
+    definition: >
+        Requires three enriched fields: ssl_cert_age_days via crt.sh
+        API at URL extraction time; sandbox_page_content via headless
+        browser sandbox on extracted URLs; url_domain extracted from
+        all links in email body at ingest. Update url_domain contains
+        list with your organization SSO and portal domain names.
+detection:
+    selection_lookalike_domain:
+        url_domain|contains:
+            - 'yourdomain-sso'
+            - 'yourdomain-portal'
+            - 'yourdomain-login'
+            - 'yourdomian'
+            - 'yourd0main'
+    selection_new_cert:
+        ssl_cert_age_days|lt: 7
+    selection_login_content:
+        sandbox_page_content|contains:
+            - 'username'
+            - 'password'
+            - 'sign in'
+            - 'login'
+            - 'verify your identity'
+            - 'authenticate'
+            - 'single sign-on'
+    condition: >
+        selection_lookalike_domain and
+        selection_new_cert and
+        selection_login_content
+falsepositives:
+    - Newly deployed internal SSO environments or portals
+    - Vendor self-service portals with recently renewed certificates
+    - New organizational subdomain launches with authentication pages
+level: high
+
+
+Rule 5: Phishing Timed to Operational Stress Windows
+
+title: Phishing Email Targeting Operational Staff During High-Stress Windows
+id: b8d0f2a4-6c1e-3b7d-a5f9-0e2c4b6d8f0a
+status: experimental
+description: >
+    Detects suspicious emails sent to operational staff during
+    predictable high-cognitive-load windows. Originally identified
+    in healthcare shift change patterns but universal across
+    manufacturing, logistics, finance, and IT operations.
+    Attackers deliberately time campaigns to exploit these transitions.
+    Customize email_hour values and recipient_department list
+    for your environment and industry.
+references:
+    - https://attack.mitre.org/techniques/T1566/002/
+    - https://www.cisa.gov/phishing
+author: Akash Parasumanna Sridhar
+date: 2026/06/01
+tags:
+    - attack.initial_access
+    - attack.t1566.002
+logsource:
+    category: email
+    definition: >
+        Requires email_hour (UTC integer 0-23) derived from timestamp
+        at ingest. Requires recipient_department via AD/AAD/Okta
+        directory integration. sender_domain_reputation_score
+        requires threat intel feed integration (0-100 scale).
+detection:
+    selection_stress_window:
+        email_hour|in:
+            - 6
+            - 7
+            - 8
+            - 14
+            - 15
+            - 22
+            - 23
+            - 0
+    selection_operational_recipient:
+        recipient_department|contains:
+            - 'Operations'
+            - 'Production'
+            - 'Logistics'
+            - 'Dispatch'
+            - 'Shift Supervisor'
+            - 'Facilities'
+            - 'Security Operations'
+            - 'Network Operations'
+            - 'Service Desk'
+            - 'Floor Management'
+    selection_suspicious:
+        sender_domain_reputation_score|lt: 50
+        contains_link: true
+    selection_urgency:
+        subject|contains:
+            - 'urgent'
+            - 'immediate action'
+            - 'expires'
+            - 'suspended'
+            - 'verify'
+            - 'locked'
+            - 'reset'
+            - 'confirm'
+            - 'action required'
+    condition: >
+        selection_stress_window and
+        selection_operational_recipient and
+        selection_suspicious and
+        selection_urgency
+falsepositives:
+    - Legitimate urgent IT communications during shift hours
+    - Scheduled system maintenance alerts timed to low-traffic windows
+    - Automated HR or payroll notifications sent overnight
+level: high
+
