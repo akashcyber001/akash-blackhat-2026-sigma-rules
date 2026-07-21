@@ -1,0 +1,55 @@
+title: Phishing Email from Newly Registered Domain with Targeted Keywords
+id: a1c3e5f7-9b2d-4f6a-8c0e-2b4d6f8a0c2e
+status: experimental
+description: >
+    Detects emails from domains registered within the last 30 days
+    that contain keywords associated with targeted phishing — financial
+    requests, credential harvesting, or account actions. Attackers
+    register fresh domains specifically to evade reputation-based
+    gateway controls. Covers BEC patterns across finance, retail,
+    manufacturing, logistics, and other sectors.
+references:
+    - https://attack.mitre.org/techniques/T1566/002/
+    - https://www.ic3.gov/Media/Y2023/PSA230609
+author: Akash Parasumanna Sridhar
+date: 2026/06/01
+tags:
+    - attack.initial_access
+    - attack.t1566.002
+logsource:
+    category: email
+    definition: >
+        Requires domain_age_days field populated via WHOIS enrichment
+        at ingest time via Logstash, Cribl, or similar pipeline.
+detection:
+    selection_new_domain:
+        domain_age_days|lt: 30
+    selection_phishing_keywords:
+        email_body|contains:
+            - 'invoice'
+            - 'payment required'
+            - 'wire transfer'
+            - 'account suspended'
+            - 'account verification'
+            - 'billing statement'
+            - 'purchase order'
+            - 'remittance'
+            - 'password expir'
+            - 'verify your account'
+            - 'confirm your identity'
+            - 'update your credentials'
+            - 'urgent action required'
+    selection_link_present:
+        contains_link: true
+    filter_internal:
+        sender_domain|endswith:
+            - 'yourdomain.com'
+    condition: >
+        selection_new_domain and
+        selection_phishing_keywords and
+        selection_link_present and
+        not filter_internal
+falsepositives:
+    - Newly onboarded vendors or startups making first contact
+    - Recently rebranded organizations using a new domain
+level: high

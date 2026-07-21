@@ -1,0 +1,86 @@
+title: Phishing Email Targeting Operational Staff During High-Stress Windows
+id: b8d0f2a4-6c1e-3b7d-a5f9-0e2c4b6d8f0a
+status: experimental
+description: >
+    Detects suspicious emails sent to operational staff during
+    predictable high-cognitive-load windows. Originally identified
+    in healthcare shift change patterns but universal across
+    manufacturing, logistics, finance, and IT operations.
+    Attackers deliberately time campaigns to exploit these transitions.
+
+    LIMITATION: email_hour must be normalized to each recipient's
+    local timezone at ingest time, not a single global UTC offset.
+    A multi-timezone organization using raw UTC hours will under-detect
+    in some offices and over-detect in others. If your pipeline cannot
+    normalize per recipient timezone, scope this rule per office/region
+    instead of deploying it org-wide.
+references:
+    - https://attack.mitre.org/techniques/T1566/002/
+    - https://www.cisa.gov/phishing
+author: Akash Parasumanna Sridhar
+date: 2026/06/01
+tags:
+    - attack.initial_access
+    - attack.t1566.002
+logsource:
+    category: email
+    definition: >
+        Requires local_hour (recipient-local time, integer 0-23) derived
+        from timestamp plus recipient timezone/office mapping at ingest —
+        NOT raw UTC hour. Requires recipient_department via AD/AAD/Okta
+        directory integration. sender_domain_reputation_score requires
+        threat intel feed integration (0-100 scale, lower is worse).
+        has_link is a boolean enrichment field populated at ingest;
+        confirm your pipeline emits true/false (not 1/0 or "yes"/"no")
+        or adjust the value type below to match your schema.
+detection:
+    selection_stress_window:
+        local_hour|in:
+            - 6
+            - 7
+            - 8
+            - 14
+            - 15
+            - 22
+            - 23
+            - 0
+    selection_operational_recipient:
+        recipient_department|contains:
+            - 'Operations'
+            - 'Production'
+            - 'Logistics'
+            - 'Dispatch'
+            - 'Shift Supervisor'
+            - 'Facilities'
+            - 'Security Operations'
+            - 'Network Operations'
+            - 'Service Desk'
+            - 'Floor Management'
+    selection_low_reputation:
+        sender_domain_reputation_score|lt: 50
+    selection_has_link:
+        has_link: true
+    selection_urgency:
+        subject|contains:
+            - 'urgent'
+            - 'immediate action'
+            - 'expires'
+            - 'suspended'
+            - 'verify'
+            - 'locked'
+            - 'reset'
+            - 'confirm'
+            - 'action required'
+    condition: >
+        selection_stress_window and
+        selection_operational_recipient and
+        selection_low_reputation and
+        selection_has_link and
+        selection_urgency
+falsepositives:
+    - Legitimate urgent IT communications during shift hours
+    - Scheduled system maintenance alerts timed to low-traffic windows
+    - Automated HR or payroll notifications sent overnight
+    - Multi-timezone deployments without per-recipient hour normalization
+      will misfire — see logsource definition
+level: high

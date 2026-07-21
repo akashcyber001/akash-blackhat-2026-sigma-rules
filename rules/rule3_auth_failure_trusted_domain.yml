@@ -1,0 +1,55 @@
+title: SPF or DMARC Failure from Implicitly Trusted External Domain
+id: f7b2d4e6-1a3c-5f8b-9d2e-4c6a8f0b2d4e
+status: experimental
+description: >
+    Detects emails that fail SPF or DMARC authentication but are
+    still delivered, from domains your organization implicitly trusts.
+    Every industry maintains trusted external relationships that
+    attackers actively exploit. Auth failures from these domains
+    typically indicate account compromise or active abuse of weak
+    DMARC p=none policies rather than misconfiguration. Populate
+    the trusted domain list with your specific long-term partners,
+    regulators, and academic institutions.
+references:
+    - https://attack.mitre.org/techniques/T1566/
+    - https://attack.mitre.org/techniques/T1078/
+    - https://www.proofpoint.com/us/blog/email-and-cloud-threats/bec-taxonomy
+author: Akash Parasumanna Sridhar
+date: 2026/06/01
+tags:
+    - attack.initial_access
+    - attack.t1566
+    - attack.t1078
+logsource:
+    category: email
+    definition: >
+        Requires spf_result, dmarc_result, delivery_status fields
+        from normalized email gateway telemetry. Standard fields
+        from Proofpoint, Mimecast, and Microsoft Defender exports.
+detection:
+    selection_spf_fail:
+        spf_result: 'fail'
+    selection_dmarc_fail:
+        dmarc_result: 'fail'
+    selection_trusted_domain:
+        sender_domain|endswith:
+            - '.edu'
+            - '.gov'
+            - '.ac.uk'
+            - 'trusted-partner.com'
+    selection_delivered:
+        delivery_status: 'delivered'
+    filter_mailing_lists:
+        email_headers|contains:
+            - 'List-Unsubscribe'
+            - 'List-Id'
+    condition: >
+        (selection_spf_fail or selection_dmarc_fail) and
+        selection_trusted_domain and
+        selection_delivered and
+        not filter_mailing_lists
+falsepositives:
+    - Email forwarding from partners breaking SPF alignment
+    - Mailing list software modifying headers and breaking DKIM
+    - Legitimately misconfigured mail servers at partner organizations
+level: medium
