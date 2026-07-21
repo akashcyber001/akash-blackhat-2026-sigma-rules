@@ -3,7 +3,7 @@
 ### Black Hat USA 2026 — Sigma Detection Rules
 
 > **Presented by Akash Parasumanna Sridhar**  
-> Cybersecurity Professional, Campbell Clinic  
+> Cybersecurity Engineer, Campbell Clinic  
 > Black Hat USA 2026 | Mandalay Bay, Las Vegas | August 5, 2026
 
 ---
