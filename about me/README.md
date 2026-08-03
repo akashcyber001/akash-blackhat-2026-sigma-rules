@@ -38,7 +38,7 @@ Currently focused on:
 
 📥 **Download my latest resume**
 
-(./Akash_PS_Resume_2026.pdf)
+Akash_PS_Resume_2026.pdf
 
 ---
 
