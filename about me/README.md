@@ -36,10 +36,7 @@ Currently focused on:
 
 # 📄 Resume
 
-📥 **Download my latest resume**
-
-Akash_PS_Resume_2026.pdf
-
+[📥 Download my latest resume](./Akash%20PS%20Resume%20and%20CV%202026.pdf?raw=1)
 ---
 
 # 📬 Connect
