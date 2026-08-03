@@ -34,10 +34,9 @@ Currently focused on:
 
 ---
 
-# 📄 Resume
+## 📄 Resume
 
-[📥 Download my latest resume](./Akash%20PS%20Resume%20and%20CV%202026.pdf?raw=1)
----
+[📥 Download my latest resume](https://raw.githubusercontent.com/akashcyber001/akash-blackhat-2026-sigma-rules/main/about%20me/Akash%20PS%20Resume%20and%20CV%202026.pdf)
 
 # 📬 Connect
 
